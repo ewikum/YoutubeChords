@@ -180,20 +180,19 @@ def chordTabled(lines):
     return out
 
 
-def write_ass_file(tabs_gz_source_file,tonality_name,out_file):
+def write_ass_file(tabs_gz_source_file,tonality_name,out_file,audio_seconds=None):
     # Open and read directly from the gzip file (in memory)
     with gzip.open(tabs_gz_source_file, "rt", encoding="utf-8") as f:
         data = json.load(f)
-
 
     song_name = data["name"]
     artist_name = data["artist"]
     capo = data["meta"]["capo"]
     tuning = data["meta"]["tuning"]
-    duration = data["meta"]["duration"]
-    end_seconds = (duration/1000)+audio_start_at+ 60 # extra 1 min just be safe
+    if audio_seconds is None:
+        audio_seconds = data["meta"]["duration"]/1000
+    audio_end_second = audio_seconds+audio_start_at
     time_signature = ""
-
 
     tempo = data["tempo"]
     chords_in_track = []
@@ -237,14 +236,14 @@ def write_ass_file(tabs_gz_source_file,tonality_name,out_file):
     start_top_gap = 140
     # show all chords from 2.5 to 3 sec with animation
     for l_i in range(0,len(lines)):
-        chords_dialogs.append(normalDialog(lines[l_i],fmt(2.5,2),fmt(3600 if len(chords_data) == 0 else audio_start_at,2),start_top_gap + l_i* line_height,start_top_gap + l_i* line_height,500,0))
+        chords_dialogs.append(normalDialog(lines[l_i],fmt(2.5,2),fmt(audio_end_second if len(chords_data) == 0 else audio_start_at,2),start_top_gap + l_i* line_height,start_top_gap + l_i* line_height,500,0))
 
     starting_l_i = 0
 
     for c_i in range(len(chords_data)):
 
         start_tf = fmt(chords_data[c_i]["start"],2)
-        end_tf = fmt(chords_data[c_i+1]["start"],2) if c_i<len(chords_data)-1 else fmt(chords_data[c_i]["start"]+3600,2)
+        end_tf = fmt(chords_data[c_i+1]["start"],2) if c_i<len(chords_data)-1 else fmt(audio_end_second,2)
 
 
         scroll_n = 0
@@ -278,9 +277,10 @@ def write_ass_file(tabs_gz_source_file,tonality_name,out_file):
                 i += 1
                 end_t = chords_start_times[0] + (i*seconds_per_beat)
 
-                beats_dialogs.append(fr"Dialogue: 0,{fmt(start_t,2)},{fmt(end_t,2)},ProgressBarBG,,0,0,0,,{{\p1\an7\pos(0,92)\c&H000000FF&}}m 0 0 l {width} 0 l {width} 8 l 0 8")
-                if end_t>=end_seconds:
+                if end_t>audio_end_second:
                     break
+
+                beats_dialogs.append(fr"Dialogue: 0,{fmt(start_t,2)},{fmt(end_t,2)},ProgressBarBG,,0,0,0,,{{\p1\an7\pos(0,92)\c&H000000FF&}}m 0 0 l {width} 0 l {width} 8 l 0 8")
 
 
     with open(out_file, "w", encoding="utf-8") as f:
@@ -375,17 +375,29 @@ Dialogue: 0,0:00:00.50,0:00:02.50,Credits,,0,0,0,,{{\fad(800,800)\blur1\pos(540,
 
 
 ; == TOP INFO BAR AFTER 4 sec
-Dialogue: 0,0:00:02.50,1:00:00.00,TopBarBG,,0,0,0,,{{\p1\an7\pos(0,0)\c&H000F0D0D&}}m 0 0 l 1080 0 l 1080 100 l 0 100
-Dialogue: 0,0:00:02.50,1:00:00.00,InfoTitle,,0,0,0,,{{\fad(800,0)\q2\pos(20,20)}}{song_name}
-Dialogue: 0,0:00:02.50,1:00:00.00,TopBarBG,,0,0,0,,{{\p1\an7\pos(880,0)\c&H000F0D0D&}}m 0 0 l 1080 0 l 1080 100 l 0 100
-Dialogue: 0,0:00:02.50,1:00:00.00,InfoRight,,0,0,0,,{{\pos(910,10)}}{tonality_name} | {time_signature}
-Dialogue: 0,0:00:02.50,1:00:00.00,InfoRight,,0,0,0,,{{\pos(910,45)}}Capo: {capo}
+Dialogue: 0,0:00:02.50,{fmt(audio_end_second,2)},TopBarBG,,0,0,0,,{{\p1\an7\pos(0,0)\c&H000F0D0D&}}m 0 0 l 1080 0 l 1080 100 l 0 100
+Dialogue: 0,0:00:02.50,{fmt(audio_end_second,2)},InfoTitle,,0,0,0,,{{\fad(800,0)\q2\pos(20,20)}}{song_name}
+Dialogue: 0,0:00:02.50,{fmt(audio_end_second,2)},TopBarBG,,0,0,0,,{{\p1\an7\pos(880,0)\c&H000F0D0D&}}m 0 0 l 1080 0 l 1080 100 l 0 100
+Dialogue: 0,0:00:02.50,{fmt(audio_end_second,2)},InfoRight,,0,0,0,,{{\pos(910,10)}}{tonality_name} | {time_signature}
+Dialogue: 0,0:00:02.50,{fmt(audio_end_second,2)},InfoRight,,0,0,0,,{{\pos(910,45)}}Capo: {capo}
 
 ; beat bar
-;Dialogue: 0,0:00:03.00,1:00:00.00,ProgressBarBG,,0,0,0,,{{\p1\an7\pos(0,92)\c&H000000FF&}}m 0 0 l 540 0 l 540 8 l 0 8
+;Dialogue: 0,0:00:03.00,{fmt(audio_end_second,2)},ProgressBarBG,,0,0,0,,{{\p1\an7\pos(0,92)\c&H000000FF&}}m 0 0 l 540 0 l 540 8 l 0 8
 
 """)
 
         f.write("\n".join(beats_dialogs))
+
+
+    used_chords = {}
+    for c_i in range(len(chords_in_track)):
+        if not chords_in_track[c_i] in used_chords:
+            used_chords[chords_in_track[c_i]] = []
+        used_chords[chords_in_track[c_i]].append({
+            "start_t" : chords_start_times[c_i],
+            "end_t" : chords_start_times[c_i+1] if c_i < len(chords_in_track)-1 else audio_end_second
+        })
+    return used_chords
+
 
 # write_ass_file("t.json.gz","Bm","test.ass")
