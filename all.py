@@ -101,7 +101,7 @@ def do(content_gz_file,source_gz_file,mp3_file=None):
     i_i = 2
     for chord, times in used_chords.items():
         ffmpeg_chord_img_inputs += f" -i '{chord_img_file(chord)}'"
-        ffmpeg_overlays += f"{'[base]' if i_i == 2 else f'[vo{i_i-1}]'}[{i_i}:v]overlay=W-w:H-h:enable='{'+'.join([f"between(t,{t["start_t"]},{t["end_t"]})" for t in times])}'[vo{i_i}];"
+        ffmpeg_overlays += f"{'[base]' if i_i == 2 else f'[vo{i_i-1}]'}[{i_i}:v]overlay=W-w:H-h:enable='{'+'.join([f"between(t,{t["start_t"]},{t["end_t"]})" for t in times])}':alpha=0.9[vo{i_i}];"
         i_i += 1
 
 
